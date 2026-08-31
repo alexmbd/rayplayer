@@ -31,6 +31,8 @@ add_subdirectory(external/RmlUi)
 # rayplayer
 set(RAYPLAYER_FILES
     ${PROJECT_SOURCE_DIR}/src/main.cpp
+
+    ${PROJECT_SOURCE_DIR}/src/mediaplayer/mediaplayer.cpp
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${RAYPLAYER_FILES})
