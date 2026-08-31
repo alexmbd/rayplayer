@@ -1,0 +1,9 @@
+[submodule "external/freetype"]
+	path = external/freetype
+	url = https://github.com/freetype/freetype
+[submodule "external/raylib"]
+	path = external/raylib
+	url = https://github.com/raysan5/raylib
+[submodule "external/RmlUi"]
+	path = external/RmlUi
+	url = https://github.com/mikke89/RmlUi
