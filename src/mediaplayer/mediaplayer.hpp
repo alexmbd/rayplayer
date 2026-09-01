@@ -4,7 +4,6 @@
 #include "mpv/render_gl.h"
 #include "raylib.h"
 
-#include <optional>
 #include <string>
 
 namespace Rayplayer
@@ -16,7 +15,7 @@ struct MediaProperties
     std::string videoCodec;
 };
 
-class MediaPlayer
+class MediaPlayer final
 {
   public:
     MediaPlayer() = default;
@@ -28,7 +27,7 @@ class MediaPlayer
     MediaPlayer(const MediaPlayer &)                     = delete;
     MediaPlayer &operator=(const MediaPlayer &)          = delete;
 
-    [[nodiscard]] std::optional<std::string> init();
+    void init();
 
     [[nodiscard]] const RenderTexture2D &texture() const;
 

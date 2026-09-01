@@ -1,3 +1,4 @@
+#include "context.hpp"
 #include "log.hpp"
 #include "mediaplayer/mediaplayer.hpp"
 
@@ -58,22 +59,16 @@ int main()
 {
     SetTraceLogCallback(raylibLog);
     SetTargetFPS(60);
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIDDEN);
     InitWindow(900, 600, "Rayplayer");
 
     {
         Rayplayer::MediaPlayer mediaPlayer;
+        mediaPlayer.init();
 
-        if (auto err = mediaPlayer.init())
-        {
-            Rayplayer::logger::error("{}", err.value());
-            mediaPlayer.~MediaPlayer();
-            CloseWindow();
-            return -1;
-        }
-
+        ClearWindowState(FLAG_WINDOW_HIDDEN);
         std::vector<std::string> droppedFilePaths;
-        while (!WindowShouldClose())
+        while (!WindowShouldClose() && !Rayplayer::context::shouldExit())
         {
             if (IsFileDropped())
             {
@@ -115,6 +110,8 @@ int main()
             EndDrawing();
         }
     }
+
+    if (Rayplayer::context::shouldExit()) { Rayplayer::logger::error("{}", Rayplayer::context::lastError()); }
 
     CloseWindow();
     return 0;
