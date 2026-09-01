@@ -51,6 +51,7 @@ add_subdirectory(external/raylib)
 # RmlUi
 set(FREETYPE_INCLUDE_DIRS "external/freetype/include/freetype" CACHE STRING "")
 set(FREETYPE_LIBRARY "Freetype::Freetype" CACHE STRING "")
+set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(external/RmlUi)
 
 # rayplayer
