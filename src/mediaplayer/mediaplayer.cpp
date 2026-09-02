@@ -11,12 +11,6 @@ namespace Rayplayer
 {
 namespace
 {
-void mpvCall(int errorCode, const char *name)
-{
-    if (errorCode >= MPV_ERROR_SUCCESS) { return; }
-    context::requestExit(std::format("({}) {}", name, mpv_error_string(errorCode)).c_str());
-}
-
 void *getProcAddress(void *ctx, const char *name)
 {
     auto proc = rlGetProcAddress(name);
@@ -42,34 +36,48 @@ void MediaPlayer::init()
     if (context::shouldExit()) { return; }
 
     m_mpvHandle = mpv_create();
-    if (!m_mpvHandle) { context::requestExit("(MediaPlayer::init) Failed to initialize mpv"); }
+    if (!m_mpvHandle) { return context::requestExit("(MediaPlayer::init) Failed to initialize mpv"); }
 
-    if (context::shouldExit()) { return; }
-    mpvCall(mpv_set_option_string(m_mpvHandle, "vo", "libmpv"), "mpv_set_option_string/vo");
+    if (auto err = mpv_set_option_string(m_mpvHandle, "vo", "libmpv"); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_set_option_string/vo) {}", mpv_error_string(err)).c_str());
+    }
 
-    if (context::shouldExit()) { return; }
-    mpvCall(mpv_set_option_string(m_mpvHandle, "hwdec", "auto"), "mpv_set_option_string/hwdec");
+    if (auto err = mpv_set_option_string(m_mpvHandle, "hwdec", "auto"); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_set_option_string/hwdec) {}", mpv_error_string(err)).c_str());
+    }
 
-    if (context::shouldExit()) { return; }
-    mpvCall(mpv_set_option_string(m_mpvHandle, "keep-open", "yes"), "mpv_set_option_string/keep-open");
+    if (auto err = mpv_set_option_string(m_mpvHandle, "keep-open", "yes"); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_set_option_string/keep-open) {}", mpv_error_string(err)).c_str());
+    }
 
-    if (context::shouldExit()) { return; }
-    mpvCall(mpv_set_option_string(m_mpvHandle, "vid", "auto"), "mpv_set_option_string/vid");
+    if (auto err = mpv_set_option_string(m_mpvHandle, "vid", "auto"); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_set_option_string/vid) {}", mpv_error_string(err)).c_str());
+    }
 
-    if (context::shouldExit()) { return; }
-    mpvCall(mpv_initialize(m_mpvHandle), "mpv_initialize");
+    if (auto err = mpv_initialize(m_mpvHandle); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_initialize) {}", mpv_error_string(err)).c_str());
+    }
 
-    if (context::shouldExit()) { return; }
-    mpvCall(mpv_request_log_messages(m_mpvHandle, "warn"), "mpv_request_log_messages");
+    if (auto err = mpv_request_log_messages(m_mpvHandle, "warn"); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_request_log_messages) {}", mpv_error_string(err)).c_str());
+    }
 
-    if (context::shouldExit()) { return; }
     mpv_opengl_init_params glInitParams{.get_proc_address = getProcAddress};
     mpv_render_param initParams[] = {
         {MPV_RENDER_PARAM_API_TYPE, const_cast<char *>(MPV_RENDER_API_TYPE_OPENGL)},
         {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &glInitParams},
         {MPV_RENDER_PARAM_INVALID, nullptr},
     };
-    mpvCall(mpv_render_context_create(&m_mpvRenderCtx, m_mpvHandle, initParams), "mpv_render_context_create");
+    if (auto err = mpv_render_context_create(&m_mpvRenderCtx, m_mpvHandle, initParams); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_render_context_create) {}", mpv_error_string(err)).c_str());
+    }
 
     mpv_render_context_set_update_callback(m_mpvRenderCtx, onMPVRender, nullptr);
     mpv_set_wakeup_callback(m_mpvHandle, onMPVEvents, nullptr);
@@ -83,7 +91,10 @@ bool MediaPlayer::isPaused()
 {
     if (context::shouldExit()) { return false; }
     int paused = 0;
-    mpvCall(mpv_get_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &paused), "mpv_get_property/pause");
+    if (auto err = mpv_get_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &paused); err < MPV_ERROR_SUCCESS)
+    {
+        context::requestExit(std::format("(mpv_get_property/pause) {}", mpv_error_string(err)).c_str());
+    }
     return paused == 1;
 }
 
@@ -91,39 +102,56 @@ void MediaPlayer::loadMedia(const char *file)
 {
     if (context::shouldExit()) { return; }
     const char *cmd[] = {"loadfile", file, nullptr};
-    mpvCall(mpv_command_async(m_mpvHandle, 0, cmd), "mpv_command_async/loadfile");
+    if (auto err = mpv_command_async(m_mpvHandle, 0, cmd); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_command_async/loadfile) {}", mpv_error_string(err)).c_str());
+    }
 }
 
 void MediaPlayer::play()
 {
     if (context::shouldExit()) { return; }
     int flag = 0;
-    mpvCall(mpv_set_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &flag), "mpv_set_property/pause");
+    if (auto err = mpv_set_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &flag); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_set_property/pause) {}", mpv_error_string(err)).c_str());
+    }
 }
 
 void MediaPlayer::pause()
 {
     if (context::shouldExit()) { return; }
     int flag = 1;
-    mpvCall(mpv_set_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &flag), "mpv_set_property/pause");
+    if (auto err = mpv_set_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &flag); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_set_property/pause) {}", mpv_error_string(err)).c_str());
+    }
 }
 
 void MediaPlayer::seek(double secondsDelta)
 {
     if (context::shouldExit()) { return; }
     const char *cmd[] = {"seek", std::format("{}", secondsDelta).c_str(), "relative", nullptr};
-    mpvCall(mpv_command_async(m_mpvHandle, 0, cmd), "mpv_command_async/seek");
+    if (auto err = mpv_command_async(m_mpvHandle, 0, cmd); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_command_async/seek) {}", mpv_error_string(err)).c_str());
+    }
 }
 
 void MediaPlayer::volume(double valueDelta)
 {
     if (context::shouldExit()) { return; }
     double value = 0.0;
-    mpvCall(mpv_get_property(m_mpvHandle, "volume", MPV_FORMAT_DOUBLE, &value), "mpv_get_property/volume");
+    if (auto err = mpv_get_property(m_mpvHandle, "volume", MPV_FORMAT_DOUBLE, &value); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_get_property/volume) {}", mpv_error_string(err)).c_str());
+    }
 
-    if (context::shouldExit()) { return; }
     value = std::clamp(value + valueDelta, 0.0, 100.0);
-    mpvCall(mpv_set_property(m_mpvHandle, "volume", MPV_FORMAT_DOUBLE, &value), "mpv_set_property/volume");
+    if (auto err = mpv_set_property(m_mpvHandle, "volume", MPV_FORMAT_DOUBLE, &value); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_set_property/volume) {}", mpv_error_string(err)).c_str());
+    }
 }
 
 void MediaPlayer::update()
@@ -154,10 +182,16 @@ void MediaPlayer::update()
             else if (event->event_id == MPV_EVENT_VIDEO_RECONFIG)
             {
                 if (context::shouldExit()) { return; }
-                mpvCall(mpv_get_property(m_mpvHandle, "dwidth", MPV_FORMAT_INT64, &m_mediaProps.videoWidth), "mpv_get_property/dwidth");
+                if (auto err = mpv_get_property(m_mpvHandle, "dwidth", MPV_FORMAT_INT64, &m_mediaProps.videoWidth); err < MPV_ERROR_SUCCESS)
+                {
+                    return context::requestExit(std::format("(mpv_get_property/dwidth) {}", mpv_error_string(err)).c_str());
+                }
 
-                if (context::shouldExit()) { return; }
-                mpvCall(mpv_get_property(m_mpvHandle, "dheight", MPV_FORMAT_INT64, &m_mediaProps.videoHeight), "mpv_get_property/dheight");
+                if (auto err = mpv_get_property(m_mpvHandle, "dheight", MPV_FORMAT_INT64, &m_mediaProps.videoHeight);
+                    err < MPV_ERROR_SUCCESS)
+                {
+                    return context::requestExit(std::format("(mpv_get_property/dheight) {}", mpv_error_string(err)).c_str());
+                }
 
                 if (m_mediaProps.videoWidth > 0 && m_mediaProps.videoHeight > 0)
                 {
@@ -166,7 +200,7 @@ void MediaPlayer::update()
                 }
                 else
                 {
-                    logger::warning("(mpv_get_property/dwidth&dheight)", "Video dimensions still unavailable");
+                    logger::warning("(mpv_get_property/dwidth&dheight) {}", "Video dimensions still unavailable");
                 }
             }
 
@@ -179,6 +213,7 @@ void MediaPlayer::update()
         if (mpv_render_context_update(m_mpvRenderCtx) & MPV_RENDER_UPDATE_FRAME)
         {
             if (context::shouldExit()) { return; }
+            if (m_targetTexture.id == 0 || m_targetTexture.texture.width <= 0 || m_targetTexture.texture.height <= 0) { return; }
 
             rlDisableBackfaceCulling();
             rlViewport(0, 0, m_targetTexture.texture.width, m_targetTexture.texture.height);
@@ -197,7 +232,10 @@ void MediaPlayer::update()
                 {MPV_RENDER_PARAM_INVALID, nullptr},
             };
 
-            mpvCall(mpv_render_context_render(m_mpvRenderCtx, renderParams), "mpv_render_context_render");
+            if (auto err = mpv_render_context_render(m_mpvRenderCtx, renderParams); err < MPV_ERROR_SUCCESS)
+            {
+                context::requestExit(std::format("(mpv_render_context_render) {}", mpv_error_string(err)).c_str());
+            }
             rlViewport(0, 0, GetScreenWidth(), GetScreenHeight());
             rlEnableBackfaceCulling();
         }

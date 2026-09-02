@@ -18,7 +18,7 @@ class MediaControls final : public Rml::EventListener
     MediaControls(const MediaControls &)                     = delete;
     MediaControls &operator=(const MediaControls &)          = delete;
 
-    [[nodiscard]] std::optional<std::string> init(Rml::ElementDocument *document, MediaPlayer *player);
+    void init(Rml::ElementDocument *document, MediaPlayer *player);
 
     void ProcessEvent(Rml::Event &event) override;
 
