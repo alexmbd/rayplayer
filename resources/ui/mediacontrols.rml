@@ -1,0 +1,54 @@
+<rml>
+<head>
+    <title>Rayplayer Controls</title>
+    <link type="text/rcss" href="mediacontrols.rcss"/>
+</head>
+<body class="controls-root">
+    <div id="controls-bar" class="controls-bar">
+
+        <div id="progress-container" class="progress-container">
+            <div class="progress-track"></div>
+            <div id="progress-buffered" class="progress-buffered"></div>
+            <div id="progress-played" class="progress-played"></div>
+            <div id="progress-thumb" class="progress-thumb"></div>
+        </div>
+
+        <div class="controls-row">
+            <div class="controls-left">
+                <div id="btn-play" class="btn btn-play">
+                    <span class="icon icon-play">&#9654;</span>
+                    <span class="icon icon-pause">&#10073;&#10073;</span>
+                </div>
+
+                <div id="volume-container" class="volume-container">
+                    <div id="btn-volume" class="btn btn-volume">
+                        <span class="icon icon-vol">&#128266;</span>
+                        <span class="icon icon-mute">&#128263;</span>
+                    </div>
+                    <div class="volume-track">
+                        <div id="volume-fill" class="volume-fill"></div>
+                    </div>
+                </div>
+
+                <div class="time-display">
+                    <span id="time-current">0:00</span>
+                    <span class="time-sep">/</span>
+                    <span id="time-duration">0:00</span>
+                </div>
+            </div>
+
+            <div class="controls-spacer"></div>
+
+            <div class="controls-right">
+                <div id="btn-settings" class="btn btn-settings">
+                    <span class="icon">&#9881;</span>
+                </div>
+                <div id="btn-fullscreen" class="btn btn-fullscreen">
+                    <span class="icon">&#9974;</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+</rml>

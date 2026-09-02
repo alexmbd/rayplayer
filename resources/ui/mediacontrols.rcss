@@ -1,0 +1,173 @@
+body {
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    font-family: "Roboto";
+    color: #ffffff;
+}
+
+.controls-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 80px;
+    padding: 0px 20px 10px 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    pointer-events: auto;
+    opacity: 1;
+    /* transition: opacity 0.25s cubic-bezier(0, 0, 0.2, 1), transform 0.25s cubic-bezier(0, 0, 0.2, 1); */
+}
+
+.controls-bar.hidden {
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+}
+
+/* --- progress bar --- */
+
+.progress-container {
+    position: relative;
+    width: 100%;
+    height: 20px;
+    cursor: pointer;
+}
+
+.progress-track,
+.progress-buffered,
+.progress-played {
+    position: absolute;
+    left: 0;
+    top: 8px;
+    height: 4px;
+    border-radius: 2px;
+}
+
+.progress-track {
+    width: 100%;
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.progress-buffered {
+    width: 0%;
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+.progress-played {
+    width: 0%;
+    background-color: #ff0000;
+}
+
+.progress-thumb {
+    position: absolute;
+    top: 4px;
+    left: 0%;
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    border-radius: 6px;
+    background-color: #ff0000;
+    opacity: 0;
+    /* transition: opacity 0.15s linear; */
+}
+
+.progress-container:hover .progress-thumb {
+    opacity: 1;
+}
+
+.progress-container:hover .progress-track {
+    height: 5px;
+}
+
+/* --- control row --- */
+
+.controls-row {
+    display: flex;
+    align-items: center;
+    height: 40px;
+}
+
+.controls-left,
+.controls-right {
+    display: flex;
+    align-items: center;
+}
+
+.controls-spacer {
+    flex-grow: 1;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    cursor: pointer;
+    margin-right: 4px;
+}
+
+.btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.icon {
+    font-size: 18px;
+    color: #ffffff;
+}
+
+/* play/pause icon swap: show the icon representing the action a click will trigger */
+.btn-play .icon-play { display: none; }
+.btn-play .icon-pause { display: block; }
+.btn-play.is-paused .icon-play { display: block; }
+.btn-play.is-paused .icon-pause { display: none; }
+
+/* volume/mute icon swap */
+.btn-volume .icon-mute { display: none; }
+.btn-volume.is-muted .icon-vol { display: none; }
+.btn-volume.is-muted .icon-mute { display: block; }
+
+.volume-container {
+    display: flex;
+    align-items: center;
+    width: 52px;
+    overflow: hidden;
+    /* transition: width 0.2s linear; */
+}
+
+.volume-container:hover {
+    width: 120px;
+}
+
+.volume-track {
+    position: relative;
+    width: 52px;
+    height: 4px;
+    margin-left: 4px;
+    border-radius: 2px;
+    background-color: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+}
+
+.volume-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    border-radius: 2px;
+    background-color: #ffffff;
+}
+
+.time-display {
+    font-size: 13px;
+    color: #ffffff;
+    margin-left: 8px;
+}
+
+.time-sep {
+    margin: 0px 3px;
+    color: rgba(255, 255, 255, 0.7);
+}

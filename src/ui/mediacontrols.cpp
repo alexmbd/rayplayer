@@ -3,6 +3,8 @@
 
 #include <format>
 
+#include "log.hpp"
+
 namespace Rayplayer
 {
 namespace
@@ -11,7 +13,20 @@ const char *g_clickIds[]     = {"btn-play", "btn-volume", "btn-fullscreen"};
 const char *g_mouseDownIds[] = {"progress-container", "volume-container"};
 }
 
-MediaControls::~MediaControls() {}
+MediaControls::~MediaControls()
+{
+    for (const char *id : g_clickIds)
+    {
+        Rml::Element *element = m_document->GetElementById(id);
+        element->RemoveEventListener(Rml::EventId::Click, this);
+    }
+
+    for (const char *id : g_mouseDownIds)
+    {
+        Rml::Element *element = m_document->GetElementById(id);
+        element->RemoveEventListener(Rml::EventId::Mousedown, this);
+    }
+}
 
 void MediaControls::init(Rml::ElementDocument *document, MediaPlayer *player)
 {
@@ -27,18 +42,23 @@ void MediaControls::init(Rml::ElementDocument *document, MediaPlayer *player)
     {
         Rml::Element *element = m_document->GetElementById(id);
         if (!element) { return context::requestExit(std::format("(MediaControls::init) Could not find element with id='{}'", id).c_str()); }
-        element->AddEventListener("click", this);
+        element->AddEventListener(Rml::EventId::Click, this);
     }
 
     for (const char *id : g_mouseDownIds)
     {
         Rml::Element *element = m_document->GetElementById(id);
         if (!element) { return context::requestExit(std::format("(MediaControls::init) Could not find element with id='{}'", id).c_str()); }
-        element->AddEventListener("mousedown", this);
+        element->AddEventListener(Rml::EventId::Mousedown, this);
     }
-
-    m_lastInputTime = GetTime();
 }
 
-void MediaControls::ProcessEvent(Rml::Event &event) {}
+void MediaControls::ProcessEvent(Rml::Event &event)
+{
+    Rml::Element *current = event.GetCurrentElement();
+
+    if (!current) { return; }
+    const auto &id = current->GetId();
+    logger::info("ID: {}", id);
+}
 }

@@ -26,8 +26,6 @@ class MediaControls final : public Rml::EventListener
     Rml::ElementDocument *m_document{}; // Non-owning pointer to Rml::ElementDocument
     MediaPlayer *m_player{};            // Non-owning pointer to MediaPlayer
 
-    double m_lastInputTime{0.0};
-
     bool m_isDraggingProgress{false};
     bool m_isDraggingVolume{false};
 };

@@ -1,6 +1,7 @@
 #include "context.hpp"
 #include "log.hpp"
 #include "mediaplayer/mediaplayer.hpp"
+#include "ui/ui.hpp"
 
 #include "rlgl.h"
 
@@ -66,6 +67,9 @@ int main()
         Rayplayer::MediaPlayer mediaPlayer;
         mediaPlayer.init();
 
+        Rayplayer::Ui ui;
+        ui.init(&mediaPlayer);
+
         ClearWindowState(FLAG_WINDOW_HIDDEN);
         std::vector<std::string> droppedFilePaths;
         while (!WindowShouldClose() && !Rayplayer::context::shouldExit())
@@ -93,6 +97,7 @@ int main()
             else if (IsKeyPressed(KEY_DOWN)) { mediaPlayer.volume(-5.0); }
 
             mediaPlayer.update();
+            ui.update();
 
             const RenderTexture2D &target           = mediaPlayer.texture();
             const Rayplayer::MediaProperties &props = mediaPlayer.mediaProps();
@@ -105,6 +110,8 @@ int main()
             rlDisableColorBlend();
             DrawTexturePro(target.texture, src, dst, {0.0f, 0.0f}, 0.0f, WHITE);
             rlEnableColorBlend();
+
+            ui.draw();
 
             DrawFPS(10, 10);
             EndDrawing();
