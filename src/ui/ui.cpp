@@ -7,7 +7,7 @@ namespace Rayplayer
 {
 Ui::~Ui()
 {
-    m_mediaControls.~MediaControls();
+    m_mediaControls.shutdown();
     m_document->Close();
 
     if (!Rml::RemoveContext(m_context->GetName()))

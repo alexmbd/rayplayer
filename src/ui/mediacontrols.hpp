@@ -9,8 +9,8 @@ namespace Rayplayer
 class MediaControls final : public Rml::EventListener
 {
   public:
-    MediaControls() = default;
-    ~MediaControls() override;
+    MediaControls()                                          = default;
+    ~MediaControls() override                                = default;
 
     MediaControls(MediaControls &&other) noexcept            = delete;
     MediaControls &operator=(MediaControls &&other) noexcept = delete;
@@ -19,6 +19,7 @@ class MediaControls final : public Rml::EventListener
     MediaControls &operator=(const MediaControls &)          = delete;
 
     void init(Rml::ElementDocument *document, MediaPlayer *player);
+    void shutdown();
 
     void ProcessEvent(Rml::Event &event) override;
 

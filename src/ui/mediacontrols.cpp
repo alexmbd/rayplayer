@@ -13,21 +13,6 @@ const char *g_clickIds[]     = {"btn-play", "btn-volume", "btn-fullscreen"};
 const char *g_mouseDownIds[] = {"progress-container", "volume-container"};
 }
 
-MediaControls::~MediaControls()
-{
-    for (const char *id : g_clickIds)
-    {
-        Rml::Element *element = m_document->GetElementById(id);
-        element->RemoveEventListener(Rml::EventId::Click, this);
-    }
-
-    for (const char *id : g_mouseDownIds)
-    {
-        Rml::Element *element = m_document->GetElementById(id);
-        element->RemoveEventListener(Rml::EventId::Mousedown, this);
-    }
-}
-
 void MediaControls::init(Rml::ElementDocument *document, MediaPlayer *player)
 {
     if (context::shouldExit()) { return; }
@@ -50,6 +35,21 @@ void MediaControls::init(Rml::ElementDocument *document, MediaPlayer *player)
         Rml::Element *element = m_document->GetElementById(id);
         if (!element) { return context::requestExit(std::format("(MediaControls::init) Could not find element with id='{}'", id).c_str()); }
         element->AddEventListener(Rml::EventId::Mousedown, this);
+    }
+}
+
+void MediaControls::shutdown()
+{
+    for (const char *id : g_clickIds)
+    {
+        Rml::Element *element = m_document->GetElementById(id);
+        element->RemoveEventListener(Rml::EventId::Click, this);
+    }
+
+    for (const char *id : g_mouseDownIds)
+    {
+        Rml::Element *element = m_document->GetElementById(id);
+        element->RemoveEventListener(Rml::EventId::Mousedown, this);
     }
 }
 
