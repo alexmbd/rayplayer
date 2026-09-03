@@ -4,7 +4,11 @@
 #include "mpv/render_gl.h"
 #include "raylib.h"
 
+#include <atomic>
 #include <string>
+#include <thread>
+
+struct GLFWwindow;
 
 namespace Rayplayer
 {
@@ -29,6 +33,8 @@ class MediaPlayer final
 
     void init();
 
+    [[nodiscard]] bool isReady() const;
+
     [[nodiscard]] const RenderTexture2D &texture() const;
 
     [[nodiscard]] const MediaProperties &mediaProps() const;
@@ -50,5 +56,11 @@ class MediaPlayer final
     RenderTexture2D m_targetTexture{};
 
     MediaProperties m_mediaProps{};
+
+    GLFWwindow *m_sharedGLContext{};
+    std::thread m_initThread;
+    std::atomic<bool> m_isReady{false};
+
+    void initWorker();
 };
 }

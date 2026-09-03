@@ -99,19 +99,22 @@ int main()
             mediaPlayer.update();
             ui.update();
 
-            const RenderTexture2D &target           = mediaPlayer.texture();
-            const Rayplayer::MediaProperties &props = mediaPlayer.mediaProps();
-            Rectangle src{0, 0, static_cast<float>(target.texture.width), -static_cast<float>(target.texture.height)};
-            Rectangle dst = getLetterboxedDst(props.videoWidth, props.videoHeight, GetScreenWidth(), GetScreenHeight());
-
             BeginDrawing();
             ClearBackground(BLACK);
 
-            rlDisableColorBlend();
-            DrawTexturePro(target.texture, src, dst, {0.0f, 0.0f}, 0.0f, WHITE);
-            rlEnableColorBlend();
+            if (mediaPlayer.isReady())
+            {
+                const RenderTexture2D &target           = mediaPlayer.texture();
+                const Rayplayer::MediaProperties &props = mediaPlayer.mediaProps();
+                Rectangle src{0, 0, static_cast<float>(target.texture.width), -static_cast<float>(target.texture.height)};
+                Rectangle dst = getLetterboxedDst(props.videoWidth, props.videoHeight, GetScreenWidth(), GetScreenHeight());
 
-            ui.draw();
+                rlDisableColorBlend();
+                DrawTexturePro(target.texture, src, dst, {0.0f, 0.0f}, 0.0f, WHITE);
+                rlEnableColorBlend();
+
+                ui.draw();
+            }
 
             DrawFPS(10, 10);
             EndDrawing();

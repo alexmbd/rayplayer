@@ -2,9 +2,9 @@
 #include "context.hpp"
 #include "log.hpp"
 
+#include "GLFW/glfw3.h"
 #include "rlgl.h"
 
-#include <atomic>
 #include <format>
 
 namespace Rayplayer
@@ -26,6 +26,14 @@ void onMPVEvents(void *data) { g_mpvEvents.store(true, std::memory_order_relaxed
 
 MediaPlayer::~MediaPlayer()
 {
+    if (m_initThread.joinable()) { m_initThread.join(); }
+
+    if (m_sharedGLContext)
+    {
+        glfwDestroyWindow(m_sharedGLContext);
+        m_sharedGLContext = nullptr;
+    }
+
     mpv_render_context_free(m_mpvRenderCtx);
     mpv_terminate_destroy(m_mpvHandle);
     UnloadRenderTexture(m_targetTexture);
@@ -35,37 +43,54 @@ void MediaPlayer::init()
 {
     if (context::shouldExit()) { return; }
 
+    GLFWwindow *mainWindow = glfwGetCurrentContext();
+    if (!mainWindow) { return context::requestExit("(MediaPlayer::init) Failed to get current window context"); }
+
+    m_sharedGLContext = glfwCreateWindow(1, 1, "", nullptr, mainWindow);
+    if (!m_sharedGLContext) { return context::requestExit("(MediaPlayer::init) Failed to create shared GL context for background init"); }
+
+    m_initThread = std::thread(&MediaPlayer::initWorker, this);
+}
+
+void MediaPlayer::initWorker()
+{
+    glfwMakeContextCurrent(m_sharedGLContext);
+
     m_mpvHandle = mpv_create();
-    if (!m_mpvHandle) { return context::requestExit("(MediaPlayer::init) Failed to initialize mpv"); }
-
-    if (auto err = mpv_set_option_string(m_mpvHandle, "vo", "libmpv"); err < MPV_ERROR_SUCCESS)
+    if (!m_mpvHandle)
     {
-        return context::requestExit(std::format("(mpv_set_option_string/vo) {}", mpv_error_string(err)).c_str());
+        context::requestExit("(MediaPlayer::init) Failed to initialize mpv");
+        glfwMakeContextCurrent(nullptr);
+        return;
     }
 
-    if (auto err = mpv_set_option_string(m_mpvHandle, "hwdec", "auto"); err < MPV_ERROR_SUCCESS)
-    {
-        return context::requestExit(std::format("(mpv_set_option_string/hwdec) {}", mpv_error_string(err)).c_str());
-    }
+    auto setOpt = [this](const char *name, const char *value) {
+        if (auto err = mpv_set_option_string(m_mpvHandle, name, value); err < MPV_ERROR_SUCCESS)
+        {
+            context::requestExit(std::format("(mpv_set_option_string/{}) {}", name, mpv_error_string(err)).c_str());
+            return false;
+        }
+        return true;
+    };
 
-    if (auto err = mpv_set_option_string(m_mpvHandle, "keep-open", "yes"); err < MPV_ERROR_SUCCESS)
+    if (!setOpt("vo", "libmpv") || !setOpt("hwdec", "auto") || !setOpt("keep-open", "yes") || !setOpt("vid", "auto"))
     {
-        return context::requestExit(std::format("(mpv_set_option_string/keep-open) {}", mpv_error_string(err)).c_str());
-    }
-
-    if (auto err = mpv_set_option_string(m_mpvHandle, "vid", "auto"); err < MPV_ERROR_SUCCESS)
-    {
-        return context::requestExit(std::format("(mpv_set_option_string/vid) {}", mpv_error_string(err)).c_str());
+        glfwMakeContextCurrent(nullptr);
+        return;
     }
 
     if (auto err = mpv_initialize(m_mpvHandle); err < MPV_ERROR_SUCCESS)
     {
-        return context::requestExit(std::format("(mpv_initialize) {}", mpv_error_string(err)).c_str());
+        context::requestExit(std::format("(mpv_initialize) {}", mpv_error_string(err)).c_str());
+        glfwMakeContextCurrent(nullptr);
+        return;
     }
 
     if (auto err = mpv_request_log_messages(m_mpvHandle, "warn"); err < MPV_ERROR_SUCCESS)
     {
-        return context::requestExit(std::format("(mpv_request_log_messages) {}", mpv_error_string(err)).c_str());
+        context::requestExit(std::format("(mpv_request_log_messages) {}", mpv_error_string(err)).c_str());
+        glfwMakeContextCurrent(nullptr);
+        return;
     }
 
     mpv_opengl_init_params glInitParams{.get_proc_address = getProcAddress};
@@ -76,12 +101,21 @@ void MediaPlayer::init()
     };
     if (auto err = mpv_render_context_create(&m_mpvRenderCtx, m_mpvHandle, initParams); err < MPV_ERROR_SUCCESS)
     {
-        return context::requestExit(std::format("(mpv_render_context_create) {}", mpv_error_string(err)).c_str());
+        context::requestExit(std::format("(mpv_render_context_create) {}", mpv_error_string(err)).c_str());
+        glfwMakeContextCurrent(nullptr);
+        return;
     }
 
     mpv_render_context_set_update_callback(m_mpvRenderCtx, onMPVRender, nullptr);
     mpv_set_wakeup_callback(m_mpvHandle, onMPVEvents, nullptr);
+
+    glFinish();
+    glfwMakeContextCurrent(nullptr);
+
+    m_isReady.store(true, std::memory_order_release);
 }
+
+bool MediaPlayer::isReady() const { return m_isReady.load(std::memory_order_acquire); }
 
 const RenderTexture2D &MediaPlayer::texture() const { return m_targetTexture; }
 
@@ -89,7 +123,7 @@ const MediaProperties &MediaPlayer::mediaProps() const { return m_mediaProps; }
 
 bool MediaPlayer::isPaused()
 {
-    if (context::shouldExit()) { return false; }
+    if (context::shouldExit() || !isReady()) { return false; }
     int paused = 0;
     if (auto err = mpv_get_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &paused); err < MPV_ERROR_SUCCESS)
     {
@@ -100,7 +134,7 @@ bool MediaPlayer::isPaused()
 
 void MediaPlayer::loadMedia(const char *file)
 {
-    if (context::shouldExit()) { return; }
+    if (context::shouldExit() || !isReady()) { return; }
     const char *cmd[] = {"loadfile", file, nullptr};
     if (auto err = mpv_command_async(m_mpvHandle, 0, cmd); err < MPV_ERROR_SUCCESS)
     {
@@ -110,7 +144,7 @@ void MediaPlayer::loadMedia(const char *file)
 
 void MediaPlayer::play()
 {
-    if (context::shouldExit()) { return; }
+    if (context::shouldExit() || !isReady()) { return; }
     int flag = 0;
     if (auto err = mpv_set_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &flag); err < MPV_ERROR_SUCCESS)
     {
@@ -120,7 +154,7 @@ void MediaPlayer::play()
 
 void MediaPlayer::pause()
 {
-    if (context::shouldExit()) { return; }
+    if (context::shouldExit() || !isReady()) { return; }
     int flag = 1;
     if (auto err = mpv_set_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &flag); err < MPV_ERROR_SUCCESS)
     {
@@ -130,7 +164,7 @@ void MediaPlayer::pause()
 
 void MediaPlayer::seek(double secondsDelta)
 {
-    if (context::shouldExit()) { return; }
+    if (context::shouldExit() || !isReady()) { return; }
     const char *cmd[] = {"seek", std::format("{}", secondsDelta).c_str(), "relative", nullptr};
     if (auto err = mpv_command_async(m_mpvHandle, 0, cmd); err < MPV_ERROR_SUCCESS)
     {
@@ -140,7 +174,7 @@ void MediaPlayer::seek(double secondsDelta)
 
 void MediaPlayer::volume(double valueDelta)
 {
-    if (context::shouldExit()) { return; }
+    if (context::shouldExit() || !isReady()) { return; }
     double value = 0.0;
     if (auto err = mpv_get_property(m_mpvHandle, "volume", MPV_FORMAT_DOUBLE, &value); err < MPV_ERROR_SUCCESS)
     {
@@ -157,6 +191,15 @@ void MediaPlayer::volume(double valueDelta)
 void MediaPlayer::update()
 {
     if (context::shouldExit()) { return; }
+
+    if (m_initThread.joinable() && m_isReady.load(std::memory_order_acquire))
+    {
+        m_initThread.join();
+        glfwDestroyWindow(m_sharedGLContext);
+        m_sharedGLContext = nullptr;
+    }
+
+    if (!isReady()) { return; }
 
     if (g_mpvEvents.exchange(false))
     {

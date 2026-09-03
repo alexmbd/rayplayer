@@ -78,5 +78,6 @@ target_include_directories(${CMAKE_PROJECT_NAME}
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/external/mpv/include
     ${PROJECT_SOURCE_DIR}/external/raylib/src
+    ${PROJECT_SOURCE_DIR}/external/raylib/src/external/glfw/include
     ${PROJECT_SOURCE_DIR}/external/RmlUi/Include
 )
