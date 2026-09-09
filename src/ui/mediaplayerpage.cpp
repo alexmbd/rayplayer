@@ -59,6 +59,7 @@ void MediaPlayerPage::update()
     else if (IsKeyPressed(KEY_DOWN)) { m_mediaPlayer.volume(-5.0); }
 
     m_mediaPlayer.update();
+    computeLayout();
 }
 
 void MediaPlayerPage::draw()
@@ -76,5 +77,47 @@ void MediaPlayerPage::draw()
         DrawTexturePro(target.texture, src, dst, {0.0f, 0.0f}, 0.0f, WHITE);
         rlEnableColorBlend();
     }
+
+    DrawRectangleRounded(m_elementRects.progress, 1.0f, 4, Colors::ProgressBase);
+
+    float playedTime =
+        m_mediaPlayer.currentTime() / (m_mediaPlayer.mediaProps().duration == 0.0 ? 1.0 : m_mediaPlayer.mediaProps().duration);
+    Rectangle playedRect = m_elementRects.progress;
+    playedRect.width     = playedRect.width * playedTime;
+    DrawRectangleRounded(playedRect, 1.0f, 4, Colors::ProgressPlayed);
+    DrawCircle(static_cast<int>(playedRect.x + playedRect.width), static_cast<int>(playedRect.y + playedRect.height * 0.5f), 7.0f,
+               Colors::ScrubberHandle);
+}
+
+void MediaPlayerPage::computeLayout()
+{
+    const float screenW           = static_cast<float>(GetScreenWidth());
+    const float screenH           = static_cast<float>(GetScreenHeight());
+
+    m_elementRects.topBar         = {0.0f, 0.0f, screenW, PageConstants::TopBarHeight};
+    m_elementRects.bottomBar      = {0.0f, screenH - PageConstants::BottomBarHeight, screenW, PageConstants::BottomBarHeight};
+
+    m_elementRects.progress       = {PageConstants::Margin * 0.5f, m_elementRects.bottomBar.y, screenW - PageConstants::Margin,
+                                     PageConstants::ProgressHeight};
+    m_elementRects.progressHitBox = {m_elementRects.progress.x, m_elementRects.progress.y - PageConstants::ProgressHitBoxPadding,
+                                     m_elementRects.progress.width,
+                                     m_elementRects.progress.height + PageConstants::ProgressHitBoxPadding * 2.0f};
+
+    float x                       = PageConstants::Margin;
+    const float y                 = m_elementRects.bottomBar.y + PageConstants::ProgressHeight + 10.0f;
+    const float btnSize           = PageConstants::IconSize + PageConstants::IconButtonPadding;
+    m_elementRects.playButton     = {x, y, btnSize, btnSize};
+    x += btnSize + PageConstants::ControlSpacing;
+
+    m_elementRects.volumeIcon = {x, y, btnSize, btnSize};
+    x += btnSize + 4.0f;
+
+    m_elementRects.volumeSlider = {x, y + btnSize * 0.5f - 2.0f, PageConstants::VolumeSliderWidth, 4.0f};
+
+    float rx                    = screenW - PageConstants::Margin - btnSize;
+    m_elementRects.fullscreen   = {rx, y, btnSize, btnSize};
+    rx -= btnSize + PageConstants::ControlSpacing;
+
+    m_elementRects.settings = {rx, y, btnSize, btnSize};
 }
 }

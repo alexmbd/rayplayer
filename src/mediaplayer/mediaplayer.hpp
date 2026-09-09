@@ -12,11 +12,14 @@ struct GLFWwindow;
 
 namespace Rayplayer
 {
+// Media properties are things about the media that will not change (constants)
 struct MediaProperties
 {
     int64_t videoWidth;
     int64_t videoHeight;
+    double duration;
     std::string videoCodec;
+    std::string title;
 };
 
 class MediaPlayer final
@@ -44,8 +47,11 @@ class MediaPlayer final
     void loadMedia(const char *file);
     void play();
     void pause();
-    void seek(double secondsDelta);
-    void volume(double valueDelta);
+    void seek(double seconds, bool isAbsolute = false);
+    void volume(double value);
+
+    [[nodiscard]] double volume();
+    [[nodiscard]] double currentTime();
 
     void update();
 
@@ -61,6 +67,13 @@ class MediaPlayer final
     std::thread m_initThread;
     std::atomic<bool> m_isReady{false};
 
+    double m_currentTime{};
+
     void initWorker();
+
+    bool handleEventLogMessage(mpv_event *event);
+    bool handleEventFileLoaded(mpv_event *event);
+    bool handleEventVideoReconfig(mpv_event *event);
+    bool handleEventPropertyChange(mpv_event *event);
 };
 }
