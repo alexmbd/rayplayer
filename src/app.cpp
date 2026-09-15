@@ -3,8 +3,6 @@
 #include "log.hpp"
 #include "ui/mediaplayerpage.hpp"
 
-#include "raylib.h"
-
 namespace Rayplayer
 {
 namespace
@@ -43,10 +41,12 @@ int run()
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIDDEN | FLAG_MSAA_4X_HINT);
     InitWindow(900, 600, "Rayplayer");
 
-    details::Application app;
+    {
+        details::Application app;
 
-    ClearWindowState(FLAG_WINDOW_HIDDEN);
-    while (!WindowShouldClose() && !context::shouldExit()) { app.update(); }
+        ClearWindowState(FLAG_WINDOW_HIDDEN);
+        while (!WindowShouldClose() && !context::shouldExit()) { app.update(); }
+    }
 
     if (context::shouldExit()) { logger::error("{}", context::lastError()); }
 
@@ -58,9 +58,12 @@ namespace details
 {
 Application::Application()
 {
+    m_font               = LoadFont("resources/fonts/Roboto/static/Roboto-Regular.ttf");
     m_currentId          = m_nextId++;
-    m_pages[m_currentId] = std::make_unique<MediaPlayerPage>();
+    m_pages[m_currentId] = std::make_unique<MediaPlayerPage>(std::addressof(m_font));
 }
+
+Application::~Application() { UnloadFont(m_font); }
 
 void Application::update()
 {

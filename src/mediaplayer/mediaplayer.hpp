@@ -37,19 +37,21 @@ class MediaPlayer final
     void init();
 
     [[nodiscard]] bool isReady() const;
-
     [[nodiscard]] const RenderTexture2D &texture() const;
-
     [[nodiscard]] const MediaProperties &mediaProps() const;
-
-    [[nodiscard]] bool isPaused();
 
     void loadMedia(const char *file);
     void play();
     void pause();
     void seek(double seconds, bool isAbsolute = false);
-    void volume(double value);
+    void volume(double value, bool isAbsolute = false);
+    void mute();
+    void unmute();
 
+    [[nodiscard]] bool isPaused();
+    [[nodiscard]] bool isMuted();
+    [[nodiscard]] bool hasMedia();
+    [[nodiscard]] double duration();
     [[nodiscard]] double volume();
     [[nodiscard]] double currentTime();
 

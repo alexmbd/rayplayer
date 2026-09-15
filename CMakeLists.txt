@@ -62,6 +62,7 @@ set(RAYPLAYER_FILES
     ${PROJECT_SOURCE_DIR}/src/mediaplayer/mediaplayer.cpp
 
     ${PROJECT_SOURCE_DIR}/src/ui/mediaplayerpage.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/widgets.cpp
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${RAYPLAYER_FILES})

@@ -124,21 +124,8 @@ void MediaPlayer::initWorker()
 }
 
 bool MediaPlayer::isReady() const { return m_isReady.load(std::memory_order_acquire); }
-
 const RenderTexture2D &MediaPlayer::texture() const { return m_targetTexture; }
-
 const MediaProperties &MediaPlayer::mediaProps() const { return m_mediaProps; }
-
-bool MediaPlayer::isPaused()
-{
-    if (context::shouldExit() || !isReady()) { return false; }
-    int paused = 0;
-    if (auto err = mpv_get_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &paused); err < MPV_ERROR_SUCCESS)
-    {
-        context::requestExit(std::format("(mpv_get_property/pause) {}", mpv_error_string(err)).c_str());
-    }
-    return paused == 1;
-}
 
 void MediaPlayer::loadMedia(const char *file)
 {
@@ -180,7 +167,7 @@ void MediaPlayer::seek(double seconds, bool isAbsolute)
     }
 }
 
-void MediaPlayer::volume(double value)
+void MediaPlayer::volume(double value, bool isAbsolute)
 {
     if (context::shouldExit() || !isReady()) { return; }
     double volValue = 0.0;
@@ -189,12 +176,60 @@ void MediaPlayer::volume(double value)
         return context::requestExit(std::format("(mpv_get_property/volume) {}", mpv_error_string(err)).c_str());
     }
 
-    volValue = std::clamp(volValue + value, 0.0, 100.0);
+    volValue = std::clamp(isAbsolute ? value : volValue + value, 0.0, 100.0);
     if (auto err = mpv_set_property(m_mpvHandle, "volume", MPV_FORMAT_DOUBLE, &volValue); err < MPV_ERROR_SUCCESS)
     {
         return context::requestExit(std::format("(mpv_set_property/volume) {}", mpv_error_string(err)).c_str());
     }
 }
+
+void MediaPlayer::mute()
+{
+    if (context::shouldExit() || !isReady()) { return; }
+    if (auto err = mpv_set_property_string(m_mpvHandle, "mute", "yes"); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_set_property_string/mute) {}", mpv_error_string(err)).c_str());
+    }
+}
+
+void MediaPlayer::unmute()
+{
+    if (context::shouldExit() || !isReady()) { return; }
+    if (auto err = mpv_set_property_string(m_mpvHandle, "mute", "no"); err < MPV_ERROR_SUCCESS)
+    {
+        return context::requestExit(std::format("(mpv_set_property_string/mute) {}", mpv_error_string(err)).c_str());
+    }
+}
+
+bool MediaPlayer::isPaused()
+{
+    if (context::shouldExit() || !isReady()) { return false; }
+    int paused = 0;
+    if (auto err = mpv_get_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &paused); err < MPV_ERROR_SUCCESS)
+    {
+        context::requestExit(std::format("(mpv_get_property/pause) {}", mpv_error_string(err)).c_str());
+    }
+    return paused == 1;
+}
+
+bool MediaPlayer::isMuted()
+{
+    if (context::shouldExit() || !isReady()) { return false; }
+    char *muted = nullptr;
+    if (auto err = mpv_get_property(m_mpvHandle, "mute", MPV_FORMAT_STRING, &muted); err < MPV_ERROR_SUCCESS)
+    {
+        context::requestExit(std::format("(mpv_get_property/mute) {}", mpv_error_string(err)).c_str());
+        mpv_free(muted);
+        return false;
+    }
+    int result = std::strcmp(muted, "yes") == 0;
+    mpv_free(muted);
+    return result == 1;
+}
+
+bool MediaPlayer::hasMedia() { return !m_mediaProps.title.empty(); }
+
+double MediaPlayer::duration() { return m_mediaProps.duration; }
 
 double MediaPlayer::volume()
 {
@@ -329,20 +364,19 @@ bool MediaPlayer::handleEventVideoReconfig(mpv_event *event)
     if (context::shouldExit()) { return false; }
     if (auto err = mpv_get_property(m_mpvHandle, "dwidth", MPV_FORMAT_INT64, &m_mediaProps.videoWidth); err < MPV_ERROR_SUCCESS)
     {
-        context::requestExit(std::format("(mpv_get_property/dwidth) {}", mpv_error_string(err)).c_str());
-        return false;
+        logger::warning("(mpv_get_property/dwidth) {}", mpv_error_string(err));
     }
 
     if (auto err = mpv_get_property(m_mpvHandle, "dheight", MPV_FORMAT_INT64, &m_mediaProps.videoHeight); err < MPV_ERROR_SUCCESS)
     {
-        context::requestExit(std::format("(mpv_get_property/dheight) {}", mpv_error_string(err)).c_str());
-        return false;
+        logger::warning("(mpv_get_property/dheight) {}", mpv_error_string(err));
     }
 
     if (m_mediaProps.videoWidth > 0 && m_mediaProps.videoHeight > 0)
     {
         UnloadRenderTexture(m_targetTexture);
         m_targetTexture = LoadRenderTexture(m_mediaProps.videoWidth, m_mediaProps.videoHeight);
+        SetTextureFilter(m_targetTexture.texture, TEXTURE_FILTER_BILINEAR);
     }
     else
     {

@@ -8,6 +8,42 @@ namespace Rayplayer
 {
 namespace
 {
+namespace Colors
+{
+constexpr Color GradientTop{0, 0, 0, 170};
+constexpr Color GradientBottom{0, 0, 0, 190};
+constexpr Color Transparent{0, 0, 0, 0};
+
+constexpr Color ProgressPlayed{255, 0, 0, 255};
+constexpr Color ProgressBuffered{255, 255, 255, 100};
+constexpr Color ProgressBase{255, 255, 255, 60};
+constexpr Color ScrubberHandle{255, 0, 0, 255};
+
+constexpr Color TextPrimary{255, 255, 255, 255};
+constexpr Color TextSecondary{255, 255, 255, 180};
+
+constexpr Color HoverOverlay{255, 255, 255, 40};
+constexpr Color IconTint{255, 255, 255, 255};
+}
+
+namespace PageConstants
+{
+constexpr float TopBarHeight{64.0f};
+constexpr float BottomBarHeight{64.0f};
+constexpr float ProgressHeight{4.0f};
+constexpr float ProgressHitBoxPadding{8.0f};
+constexpr float Margin{16.0f};
+constexpr float ControlSpacing{16.0f};
+constexpr float VolumeSliderWidth{60.0f};
+
+constexpr float IconSize{32.0f};
+constexpr float IconButtonPadding{8.0f};
+
+constexpr float IdleTimeoutSeconds{3.0f};
+constexpr float FadeSpeed{8.0f};
+constexpr float MouseMoveThreshold{1.0f};
+}
+
 Rectangle letterboxedDst(int videoW, int videoH, int winW, int winH)
 {
     float videoAspect = static_cast<float>(videoW) / videoH;
@@ -32,7 +68,71 @@ Rectangle letterboxedDst(int videoW, int videoH, int winW, int winH)
 }
 }
 
-MediaPlayerPage::MediaPlayerPage() { m_mediaPlayer.init(); }
+MediaPlayerPage::MediaPlayerPage(Font *font)
+{
+    m_font = font;
+    m_mediaPlayer.init();
+    SetTextureFilter(m_mediaPlayer.texture().texture, TEXTURE_FILTER_BILINEAR);
+
+    m_textures["pause"]      = LoadTexture("resources/icons/pause32.png");
+    m_textures["play"]       = LoadTexture("resources/icons/play32.png");
+    m_textures["volume"]     = LoadTexture("resources/icons/volume32.png");
+    m_textures["volumehigh"] = LoadTexture("resources/icons/volumehigh32.png");
+    m_textures["volumelow"]  = LoadTexture("resources/icons/volumelow32.png");
+    m_textures["volumemute"] = LoadTexture("resources/icons/volumemute32.png");
+    for (const auto &[_, texture] : m_textures) { SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR); }
+
+    m_progressSlider.trackColor(Colors::ProgressBase);
+    m_progressSlider.fillColor(Colors::ProgressPlayed);
+    m_progressSlider.handleColor(Colors::ScrubberHandle);
+    m_progressSlider.onValueChange = [this](double value) {
+        if (!m_mediaPlayer.hasMedia()) { return; }
+        m_mediaPlayer.seek(value * m_mediaPlayer.duration(), true);
+    };
+
+    m_playBtn.icon(std::addressof(m_textures["play"]));
+    m_playBtn.iconSize(PageConstants::IconSize);
+    m_playBtn.onClick = [this]() {
+        if (!m_mediaPlayer.hasMedia()) { return; }
+        if (m_mediaPlayer.isPaused())
+        {
+            m_playBtn.icon(std::addressof(m_textures["pause"]));
+            m_mediaPlayer.play();
+        }
+        else
+        {
+            m_playBtn.icon(std::addressof(m_textures["play"]));
+            m_mediaPlayer.pause();
+        }
+    };
+
+    m_volumeBtn.icon(std::addressof(m_textures["volumehigh"]));
+    m_volumeBtn.iconSize(PageConstants::IconSize);
+    m_volumeBtn.onClick = [this]() {
+        if (!m_mediaPlayer.hasMedia()) { return; }
+        if (m_mediaPlayer.isMuted())
+        {
+            m_volumeBtn.icon(std::addressof(m_textures["volumehigh"]));
+            m_mediaPlayer.unmute();
+        }
+        else
+        {
+            m_volumeBtn.icon(std::addressof(m_textures["volumemute"]));
+            m_mediaPlayer.mute();
+        }
+    };
+
+    m_volumeSlider.trackColor(Colors::ProgressBase);
+    m_volumeSlider.onValueChange = [this](double value) {
+        if (!m_mediaPlayer.hasMedia()) { return; }
+        m_mediaPlayer.volume(value * 100.0, true);
+    };
+}
+
+MediaPlayerPage::~MediaPlayerPage()
+{
+    for (const auto &[_, texture] : m_textures) { UnloadTexture(texture); }
+}
 
 void MediaPlayerPage::update()
 {
@@ -43,23 +143,41 @@ void MediaPlayerPage::update()
         for (uint32_t i = 0; i < droppedFiles.count; i++) { droppedFilePaths.push_back(droppedFiles.paths[i]); }
         UnloadDroppedFiles(droppedFiles);
         if (droppedFilePaths.size() >= 1) { m_mediaPlayer.loadMedia(droppedFilePaths[0].c_str()); }
+        m_playBtn.icon(std::addressof(m_textures["pause"]));
     }
 
-    if (IsKeyPressed(KEY_SPACE))
+    if (m_mediaPlayer.hasMedia())
     {
-        if (m_mediaPlayer.isPaused()) { m_mediaPlayer.play(); }
-        else
+        if (IsKeyPressed(KEY_SPACE))
         {
-            m_mediaPlayer.pause();
+            if (m_mediaPlayer.isPaused())
+            {
+                m_playBtn.icon(std::addressof(m_textures["pause"]));
+                m_mediaPlayer.play();
+            }
+            else
+            {
+                m_playBtn.icon(std::addressof(m_textures["play"]));
+                m_mediaPlayer.pause();
+            }
         }
+        else if (IsKeyPressed(KEY_LEFT)) { m_mediaPlayer.seek(-5.0); }
+        else if (IsKeyPressed(KEY_RIGHT)) { m_mediaPlayer.seek(5.0); }
+        else if (IsKeyPressed(KEY_UP)) { m_mediaPlayer.volume(5.0); }
+        else if (IsKeyPressed(KEY_DOWN)) { m_mediaPlayer.volume(-5.0); }
+        else if (IsKeyPressed(KEY_F)) { ToggleFullscreen(); }
     }
-    else if (IsKeyPressed(KEY_LEFT)) { m_mediaPlayer.seek(-5.0); }
-    else if (IsKeyPressed(KEY_RIGHT)) { m_mediaPlayer.seek(5.0); }
-    else if (IsKeyPressed(KEY_UP)) { m_mediaPlayer.volume(5.0); }
-    else if (IsKeyPressed(KEY_DOWN)) { m_mediaPlayer.volume(-5.0); }
 
     m_mediaPlayer.update();
     computeLayout();
+
+    auto mouseEvent = MouseEvent{MOUSE_BUTTON_LEFT};
+    m_progressSlider.value(m_mediaPlayer.currentTime() / (m_mediaPlayer.duration() == 0.0 ? 1.0 : m_mediaPlayer.duration()));
+    m_progressSlider.update(mouseEvent);
+    m_playBtn.update(mouseEvent);
+    m_volumeBtn.update(mouseEvent);
+    m_volumeSlider.value(m_mediaPlayer.volume() / 100.0);
+    m_volumeSlider.update(mouseEvent);
 }
 
 void MediaPlayerPage::draw()
@@ -78,46 +196,33 @@ void MediaPlayerPage::draw()
         rlEnableColorBlend();
     }
 
-    DrawRectangleRounded(m_elementRects.progress, 1.0f, 4, Colors::ProgressBase);
-
-    float playedTime =
-        m_mediaPlayer.currentTime() / (m_mediaPlayer.mediaProps().duration == 0.0 ? 1.0 : m_mediaPlayer.mediaProps().duration);
-    Rectangle playedRect = m_elementRects.progress;
-    playedRect.width     = playedRect.width * playedTime;
-    DrawRectangleRounded(playedRect, 1.0f, 4, Colors::ProgressPlayed);
-    DrawCircle(static_cast<int>(playedRect.x + playedRect.width), static_cast<int>(playedRect.y + playedRect.height * 0.5f), 7.0f,
-               Colors::ScrubberHandle);
+    m_progressSlider.draw();
+    m_playBtn.draw();
+    m_volumeBtn.draw();
+    m_volumeSlider.draw();
 }
 
 void MediaPlayerPage::computeLayout()
 {
-    const float screenW           = static_cast<float>(GetScreenWidth());
-    const float screenH           = static_cast<float>(GetScreenHeight());
+    const float screenW    = static_cast<float>(GetScreenWidth());
+    const float screenH    = static_cast<float>(GetScreenHeight());
 
-    m_elementRects.topBar         = {0.0f, 0.0f, screenW, PageConstants::TopBarHeight};
-    m_elementRects.bottomBar      = {0.0f, screenH - PageConstants::BottomBarHeight, screenW, PageConstants::BottomBarHeight};
+    const float bottomBarY = screenH - PageConstants::BottomBarHeight;
+    const float controlsY  = bottomBarY + PageConstants::ProgressHeight + 8.0f;
 
-    m_elementRects.progress       = {PageConstants::Margin * 0.5f, m_elementRects.bottomBar.y, screenW - PageConstants::Margin,
-                                     PageConstants::ProgressHeight};
-    m_elementRects.progressHitBox = {m_elementRects.progress.x, m_elementRects.progress.y - PageConstants::ProgressHitBoxPadding,
-                                     m_elementRects.progress.width,
-                                     m_elementRects.progress.height + PageConstants::ProgressHitBoxPadding * 2.0f};
+    m_progressSlider.bounds(Rectangle{PageConstants::Margin, bottomBarY - PageConstants::ProgressHeight * 0.5f,
+                                      screenW - PageConstants::Margin * 2.0f, PageConstants::ProgressHeight});
 
-    float x                       = PageConstants::Margin;
-    const float y                 = m_elementRects.bottomBar.y + PageConstants::ProgressHeight + 10.0f;
-    const float btnSize           = PageConstants::IconSize + PageConstants::IconButtonPadding;
-    m_elementRects.playButton     = {x, y, btnSize, btnSize};
-    x += btnSize + PageConstants::ControlSpacing;
+    float x = PageConstants::Margin;
+    m_playBtn.bounds(Rectangle{x, controlsY, m_playBtn.iconSize() + PageConstants::IconButtonPadding,
+                               m_playBtn.iconSize() + PageConstants::IconButtonPadding});
+    x += m_playBtn.iconSize() + PageConstants::IconButtonPadding + PageConstants::ControlSpacing;
 
-    m_elementRects.volumeIcon = {x, y, btnSize, btnSize};
-    x += btnSize + 4.0f;
+    m_volumeBtn.bounds(Rectangle{x, controlsY, m_volumeBtn.iconSize() + PageConstants::IconButtonPadding,
+                                 m_volumeBtn.iconSize() + PageConstants::IconButtonPadding});
+    x += m_volumeBtn.iconSize() + PageConstants::IconButtonPadding + PageConstants::ControlSpacing - 4.0f;
 
-    m_elementRects.volumeSlider = {x, y + btnSize * 0.5f - 2.0f, PageConstants::VolumeSliderWidth, 4.0f};
-
-    float rx                    = screenW - PageConstants::Margin - btnSize;
-    m_elementRects.fullscreen   = {rx, y, btnSize, btnSize};
-    rx -= btnSize + PageConstants::ControlSpacing;
-
-    m_elementRects.settings = {rx, y, btnSize, btnSize};
+    m_volumeSlider.bounds(Rectangle{x, controlsY + (m_volumeBtn.iconSize() + PageConstants::IconButtonPadding) * 0.45f,
+                                    PageConstants::VolumeSliderWidth, PageConstants::ProgressHeight});
 }
 }

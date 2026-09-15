@@ -2,6 +2,8 @@
 
 #include "ui/page.hpp"
 
+#include "raylib.h"
+
 #include <memory>
 #include <unordered_map>
 
@@ -13,7 +15,7 @@ class Application final
 {
   public:
     Application();
-    ~Application()                                       = default;
+    ~Application();
 
     Application(Application &&other) noexcept            = delete;
     Application &operator=(Application &&other) noexcept = delete;
@@ -25,6 +27,7 @@ class Application final
 
   private:
     std::unordered_map<uint8_t, std::unique_ptr<Page>> m_pages;
+    Font m_font;
     uint8_t m_nextId{1};
     uint8_t m_currentId{0};
 };
