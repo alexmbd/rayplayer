@@ -107,11 +107,16 @@ void MediaPlayer::initWorker()
         return;
     }
 
-    if (auto err = mpv_observe_property(m_mpvHandle, 0, "time-pos", MPV_FORMAT_DOUBLE); err < MPV_ERROR_SUCCESS)
+    for (size_t i = 0; i < MediaProperties::properties.size(); i++)
     {
-        context::requestExit(std::format("(mpv_observe_property/time-pos) {}", mpv_error_string(err)).c_str());
-        glfwMakeContextCurrent(nullptr);
-        return;
+        if (auto err = mpv_observe_property(m_mpvHandle, i + 1, MediaProperties::properties[i].name, MediaProperties::properties[i].format);
+            err < MPV_ERROR_SUCCESS)
+        {
+            context::requestExit(
+                std::format("(mpv_observe_property/{}) {}", MediaProperties::properties[i].name, mpv_error_string(err)).c_str());
+            glfwMakeContextCurrent(nullptr);
+            return;
+        }
     }
 
     mpv_render_context_set_update_callback(m_mpvRenderCtx, onMPVRender, nullptr);
@@ -125,7 +130,6 @@ void MediaPlayer::initWorker()
 
 bool MediaPlayer::isReady() const { return m_isReady.load(std::memory_order_acquire); }
 const RenderTexture2D &MediaPlayer::texture() const { return m_targetTexture; }
-const MediaProperties &MediaPlayer::mediaProps() const { return m_mediaProps; }
 
 void MediaPlayer::loadMedia(const char *file)
 {
@@ -160,7 +164,8 @@ void MediaPlayer::pause()
 void MediaPlayer::seek(double seconds, bool isAbsolute)
 {
     if (context::shouldExit() || !isReady()) { return; }
-    const char *cmd[] = {"seek", std::format("{}", seconds).c_str(), isAbsolute ? "absolute" : "relative", nullptr};
+    std::string time  = std::format("{}", seconds);
+    const char *cmd[] = {"seek", time.c_str(), isAbsolute ? "absolute" : "relative", nullptr};
     if (auto err = mpv_command_async(m_mpvHandle, 0, cmd); err < MPV_ERROR_SUCCESS)
     {
         return context::requestExit(std::format("(mpv_command_async/seek) {}", mpv_error_string(err)).c_str());
@@ -170,13 +175,8 @@ void MediaPlayer::seek(double seconds, bool isAbsolute)
 void MediaPlayer::volume(double value, bool isAbsolute)
 {
     if (context::shouldExit() || !isReady()) { return; }
-    double volValue = 0.0;
-    if (auto err = mpv_get_property(m_mpvHandle, "volume", MPV_FORMAT_DOUBLE, &volValue); err < MPV_ERROR_SUCCESS)
-    {
-        return context::requestExit(std::format("(mpv_get_property/volume) {}", mpv_error_string(err)).c_str());
-    }
-
-    volValue = std::clamp(isAbsolute ? value : volValue + value, 0.0, 100.0);
+    double volValue = m_props.get<MediaProperties::PropertyId::Volume>();
+    volValue        = std::clamp(isAbsolute ? value : volValue + value, 0.0, 100.0);
     if (auto err = mpv_set_property(m_mpvHandle, "volume", MPV_FORMAT_DOUBLE, &volValue); err < MPV_ERROR_SUCCESS)
     {
         return context::requestExit(std::format("(mpv_set_property/volume) {}", mpv_error_string(err)).c_str());
@@ -201,52 +201,29 @@ void MediaPlayer::unmute()
     }
 }
 
-bool MediaPlayer::isPaused()
-{
-    if (context::shouldExit() || !isReady()) { return false; }
-    int paused = 0;
-    if (auto err = mpv_get_property(m_mpvHandle, "pause", MPV_FORMAT_FLAG, &paused); err < MPV_ERROR_SUCCESS)
-    {
-        context::requestExit(std::format("(mpv_get_property/pause) {}", mpv_error_string(err)).c_str());
-    }
-    return paused == 1;
-}
+// ---------- PROPERTIES ----------
 
-bool MediaPlayer::isMuted()
-{
-    if (context::shouldExit() || !isReady()) { return false; }
-    char *muted = nullptr;
-    if (auto err = mpv_get_property(m_mpvHandle, "mute", MPV_FORMAT_STRING, &muted); err < MPV_ERROR_SUCCESS)
-    {
-        context::requestExit(std::format("(mpv_get_property/mute) {}", mpv_error_string(err)).c_str());
-        mpv_free(muted);
-        return false;
-    }
-    int result = std::strcmp(muted, "yes") == 0;
-    mpv_free(muted);
-    return result == 1;
-}
+double MediaPlayer::duration() { return m_props.get<MediaProperties::PropertyId::Duration>(); }
+double MediaPlayer::currentTime() { return m_props.get<MediaProperties::PropertyId::CurrentTime>(); }
+double MediaPlayer::cacheTime() { return m_props.get<MediaProperties::PropertyId::CacheTime>(); }
+double MediaPlayer::volume() { return m_props.get<MediaProperties::PropertyId::Volume>(); }
 
-bool MediaPlayer::hasMedia() { return !m_mediaProps.title.empty(); }
+int64_t MediaPlayer::videoWidth() { return m_props.get<MediaProperties::PropertyId::VideoWidth>(); }
+int64_t MediaPlayer::videoHeight() { return m_props.get<MediaProperties::PropertyId::VideoHeight>(); }
+int64_t MediaPlayer::frameDropCount() { return m_props.get<MediaProperties::PropertyId::FrameDropCount>(); }
 
-double MediaPlayer::duration() { return m_mediaProps.duration; }
+const std::string &MediaPlayer::title() { return m_props.get<MediaProperties::PropertyId::Title>(); }
+const std::string &MediaPlayer::filename() { return m_props.get<MediaProperties::PropertyId::Filename>(); }
+const std::string &MediaPlayer::videoCodec() { return m_props.get<MediaProperties::PropertyId::VideoCodec>(); }
+const std::string &MediaPlayer::hwdec() { return m_props.get<MediaProperties::PropertyId::Hwdec>(); }
+const std::string &MediaPlayer::vo() { return m_props.get<MediaProperties::PropertyId::VO>(); }
+const std::string &MediaPlayer::ao() { return m_props.get<MediaProperties::PropertyId::AO>(); }
 
-double MediaPlayer::volume()
-{
-    if (context::shouldExit() || !isReady()) { return 0.0; }
-    double value = 0.0;
-    if (auto err = mpv_get_property(m_mpvHandle, "volume", MPV_FORMAT_DOUBLE, &value); err < MPV_ERROR_SUCCESS)
-    {
-        context::requestExit(std::format("(mpv_get_property/volume) {}", mpv_error_string(err)).c_str());
-    }
-    return value;
-}
-
-double MediaPlayer::currentTime()
-{
-    if (context::shouldExit() || !isReady()) { return 0.0; }
-    return m_currentTime;
-}
+bool MediaPlayer::isMuted() { return m_props.get<MediaProperties::PropertyId::IsMuted>(); }
+bool MediaPlayer::isPaused() { return m_props.get<MediaProperties::PropertyId::IsPaused>(); }
+bool MediaPlayer::isPausedForCache() { return m_props.get<MediaProperties::PropertyId::IsPausedForCache>(); }
+bool MediaPlayer::hasReachedEnd() { return m_props.get<MediaProperties::PropertyId::HasReachedEnd>(); }
+bool MediaPlayer::hasMedia() { return m_props.get<MediaProperties::PropertyId::Duration>() > 0.0; }
 
 void MediaPlayer::update()
 {
@@ -270,9 +247,6 @@ void MediaPlayer::update()
             {
             case MPV_EVENT_LOG_MESSAGE:
                 if (!handleEventLogMessage(event)) { return; }
-                break;
-            case MPV_EVENT_FILE_LOADED:
-                if (!handleEventFileLoaded(event)) { return; }
                 break;
             case MPV_EVENT_VIDEO_RECONFIG:
                 if (!handleEventVideoReconfig(event)) { return; }
@@ -330,52 +304,25 @@ bool MediaPlayer::handleEventLogMessage(mpv_event *event)
     return true;
 }
 
-bool MediaPlayer::handleEventFileLoaded(mpv_event *event)
-{
-    if (context::shouldExit()) { return false; }
-    char *codec = mpv_get_property_string(m_mpvHandle, "video-codec");
-    if (codec) { m_mediaProps.videoCodec = codec; }
-    else
-    {
-        context::requestExit("(mpv_get_property_string/video-codec) Failed to get video codec");
-    }
-    mpv_free(codec);
-
-    if (context::shouldExit()) { return false; }
-    char *title = mpv_get_property_string(m_mpvHandle, "media-title");
-    if (title) { m_mediaProps.title = title; }
-    else
-    {
-        context::requestExit("(mpv_get_property_string/media-title) Failed to get media title");
-    }
-    mpv_free(title);
-
-    if (context::shouldExit()) { return false; }
-    if (auto err = mpv_get_property(m_mpvHandle, "duration", MPV_FORMAT_DOUBLE, &m_mediaProps.duration); err < MPV_ERROR_SUCCESS)
-    {
-        context::requestExit(std::format("(mpv_get_property/duration) {}", mpv_error_string(err)).c_str());
-        return false;
-    }
-    return true;
-}
-
 bool MediaPlayer::handleEventVideoReconfig(mpv_event *event)
 {
     if (context::shouldExit()) { return false; }
-    if (auto err = mpv_get_property(m_mpvHandle, "dwidth", MPV_FORMAT_INT64, &m_mediaProps.videoWidth); err < MPV_ERROR_SUCCESS)
+    int64_t width{};
+    int64_t height{};
+    if (auto err = mpv_get_property(m_mpvHandle, "dwidth", MPV_FORMAT_INT64, &width); err < MPV_ERROR_SUCCESS)
     {
         logger::warning("(mpv_get_property/dwidth) {}", mpv_error_string(err));
     }
 
-    if (auto err = mpv_get_property(m_mpvHandle, "dheight", MPV_FORMAT_INT64, &m_mediaProps.videoHeight); err < MPV_ERROR_SUCCESS)
+    if (auto err = mpv_get_property(m_mpvHandle, "dheight", MPV_FORMAT_INT64, &height); err < MPV_ERROR_SUCCESS)
     {
         logger::warning("(mpv_get_property/dheight) {}", mpv_error_string(err));
     }
 
-    if (m_mediaProps.videoWidth > 0 && m_mediaProps.videoHeight > 0)
+    if (width > 0 && height > 0)
     {
         UnloadRenderTexture(m_targetTexture);
-        m_targetTexture = LoadRenderTexture(m_mediaProps.videoWidth, m_mediaProps.videoHeight);
+        m_targetTexture = LoadRenderTexture(width, height);
         SetTextureFilter(m_targetTexture.texture, TEXTURE_FILTER_BILINEAR);
     }
     else
@@ -390,10 +337,8 @@ bool MediaPlayer::handleEventPropertyChange(mpv_event *event)
     if (context::shouldExit()) { return false; }
     auto prop = static_cast<mpv_event_property *>(event->data);
     if (!prop) { return false; }
-    if (prop->data && prop->format == MPV_FORMAT_DOUBLE && std::strcmp(prop->name, "time-pos") == 0)
-    {
-        m_currentTime = *static_cast<double *>(prop->data);
-    }
+
+    m_props.update(event->reply_userdata, *prop);
     return true;
 }
 }

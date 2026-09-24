@@ -186,10 +186,9 @@ void MediaPlayerPage::draw()
 
     if (m_mediaPlayer.isReady())
     {
-        const RenderTexture2D &target           = m_mediaPlayer.texture();
-        const Rayplayer::MediaProperties &props = m_mediaPlayer.mediaProps();
+        const RenderTexture2D &target = m_mediaPlayer.texture();
         Rectangle src{0, 0, static_cast<float>(target.texture.width), -static_cast<float>(target.texture.height)};
-        Rectangle dst = letterboxedDst(props.videoWidth, props.videoHeight, GetScreenWidth(), GetScreenHeight());
+        Rectangle dst = letterboxedDst(m_mediaPlayer.videoWidth(), m_mediaPlayer.videoHeight(), GetScreenWidth(), GetScreenHeight());
 
         rlDisableColorBlend();
         DrawTexturePro(target.texture, src, dst, {0.0f, 0.0f}, 0.0f, WHITE);
